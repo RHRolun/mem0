@@ -1318,11 +1318,7 @@ class Memory(MemoryBase):
             effective_filters["run_id"] = _validate_and_trim_entity_id(
                 effective_filters["run_id"], "run_id"
             )
-        if not any(key in effective_filters for key in ("user_id", "agent_id", "run_id")):
-            raise ValueError(
-                "filters must contain at least one of: user_id, agent_id, run_id. "
-                "Example: filters={'user_id': 'u1'}"
-            )
+        # Allow empty filters for global search across all memories
 
         limit = top_k
         scale_threshold_notice = detect_scale_threshold_from_top_k(top_k)
@@ -2859,13 +2855,7 @@ class AsyncMemory(MemoryBase):
             effective_filters["run_id"] = _validate_and_trim_entity_id(
                 effective_filters["run_id"], "run_id"
             )
-
-        # Validate filters contains at least one entity ID
-        if not any(key in effective_filters for key in ("user_id", "agent_id", "run_id")):
-            raise ValueError(
-                "filters must contain at least one of: user_id, agent_id, run_id. "
-                "Example: filters={'user_id': 'u1'}"
-            )
+        # Allow empty filters for global search across all memories
 
         limit = top_k
         scale_threshold_notice = detect_scale_threshold_from_top_k(top_k)
