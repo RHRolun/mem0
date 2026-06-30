@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 from typing import Dict, List, Optional, Union
 
 from openai import OpenAI
@@ -80,7 +81,21 @@ class OpenAILLM(LLMBase):
 
             return processed_response
         else:
-            return response.choices[0].message.content
+            content = response.choices[0].message.content
+            if not content:
+                # Thinking models (e.g. Qwen3) sometimes return content=None when
+                # response_format=json_object conflicts with thinking mode. The JSON
+                # answer may have ended up in reasoning_content instead.
+                reasoning = getattr(response.choices[0].message, "reasoning_content", None)
+                if reasoning:
+                    stripped = re.sub(r"<think>.*?</think>", "", reasoning, flags=re.DOTALL).strip()
+                    match = re.search(r"\{.*\}", stripped, re.DOTALL)
+                    if match:
+                        logging.getLogger(__name__).debug(
+                            "Recovered JSON answer from reasoning_content (content was None)"
+                        )
+                        content = match.group(0)
+            return content
 
     def generate_response(
         self,

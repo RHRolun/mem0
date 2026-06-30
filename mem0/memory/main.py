@@ -848,7 +848,9 @@ class Memory(MemoryBase):
 
         # Parse response
         try:
-            response = remove_code_blocks(response)
+            if not response:
+                logger.warning("LLM extraction returned empty/None content (Case C: answer lost)")
+            response = remove_code_blocks(response or "")
             if not response or not response.strip():
                 extracted_memories = []
             else:
@@ -2386,7 +2388,9 @@ class AsyncMemory(MemoryBase):
 
         # Parse response
         try:
-            response = remove_code_blocks(response)
+            if not response:
+                logger.warning("LLM extraction returned empty/None content (async) (Case C: answer lost)")
+            response = remove_code_blocks(response or "")
             if not response or not response.strip():
                 extracted_memories = []
             else:
