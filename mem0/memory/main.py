@@ -840,7 +840,10 @@ class Memory(MemoryBase):
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                response_format={"type": "json_object"},
+                # response_format={"type": "json_object"} omitted: conflicts with
+                # Qwen3 thinking mode, causing malformed JSON, trailing artifacts,
+                # or None content. The prompt already requests JSON; the parsing
+                # chain (remove_code_blocks → extract_json → raw_decode) handles cleanup.
             )
         except Exception as e:
             logger.error(f"LLM extraction failed: {e}")
@@ -2386,7 +2389,10 @@ class AsyncMemory(MemoryBase):
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                response_format={"type": "json_object"},
+                # response_format={"type": "json_object"} omitted: conflicts with
+                # Qwen3 thinking mode, causing malformed JSON, trailing artifacts,
+                # or None content. The prompt already requests JSON; the parsing
+                # chain (remove_code_blocks → extract_json → raw_decode) handles cleanup.
             )
         except Exception as e:
             logger.error(f"LLM extraction failed (async): {e}")
