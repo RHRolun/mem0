@@ -159,16 +159,32 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_exception_handler(UpstreamError, upstream_error_handler)
 
 
+async def _log_request_body(request: Request) -> str:
+    try:
+        body = await request.body()
+        return body.decode("utf-8", errors="replace")[:500] if body else ""
+    except Exception:
+        return "<unreadable>"
+
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     if exc.status_code >= 400:
-        logging.warning("%s %s → %d: %s", request.method, request.url.path, exc.status_code, exc.detail)
+        body = await _log_request_body(request)
+        logging.warning(
+            "%s %s → %d: %s | body: %s",
+            request.method, request.url.path, exc.status_code, exc.detail, body,
+        )
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    logging.warning("%s %s → 422 validation error: %s", request.method, request.url.path, exc.errors())
+    body = await _log_request_body(request)
+    logging.warning(
+        "%s %s → 422 validation error: %s | body: %s",
+        request.method, request.url.path, exc.errors(), body,
+    )
     return JSONResponse(status_code=422, content={"detail": exc.errors()})
 DASHBOARD_URL = os.environ.get("DASHBOARD_URL", "http://localhost:3000")
 app.add_middleware(
