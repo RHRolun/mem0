@@ -1,4 +1,6 @@
+import logging
 import os
+import time
 import warnings
 from typing import Literal, Optional
 
@@ -6,6 +8,40 @@ from openai import OpenAI
 
 from mem0.configs.embeddings.base import BaseEmbedderConfig
 from mem0.embeddings.base import EmbeddingBase
+
+logger = logging.getLogger(__name__)
+
+_RETRYABLE = None
+
+
+def _get_retryable():
+    """Lazily import httpx so we don't hard-depend on it at module load."""
+    global _RETRYABLE
+    if _RETRYABLE is None:
+        try:
+            import httpx
+            _RETRYABLE = (httpx.RemoteProtocolError, httpx.ConnectError, httpx.ReadError)
+        except ImportError:
+            _RETRYABLE = ()
+    return _RETRYABLE
+
+
+def _retry_embed(fn, *args, retries=3, delay=1.0, **kwargs):
+    """Call fn(*args, **kwargs) with retries on transient connection errors."""
+    for attempt in range(retries):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            retryable = _get_retryable()
+            if retryable and isinstance(e, retryable) and attempt < retries - 1:
+                logger.warning(
+                    f"Embedding request failed with {type(e).__name__}: {e}. "
+                    f"Retrying in {delay}s (attempt {attempt + 1}/{retries})..."
+                )
+                time.sleep(delay)
+                delay *= 2
+            else:
+                raise
 
 
 class OpenAIEmbedding(EmbeddingBase):
@@ -52,7 +88,7 @@ class OpenAIEmbedding(EmbeddingBase):
         }
         if self._pass_dimensions_to_api:
             kwargs["dimensions"] = self.config.embedding_dims
-        return self.client.embeddings.create(**kwargs).data[0].embedding
+        return _retry_embed(self.client.embeddings.create, **kwargs).data[0].embedding
 
     def embed_batch(self, texts, memory_action="add"):
         """Embed multiple texts in a single OpenAI API call.
@@ -71,6 +107,6 @@ class OpenAIEmbedding(EmbeddingBase):
             }
             if self._pass_dimensions_to_api:
                 kwargs["dimensions"] = self.config.embedding_dims
-            response = self.client.embeddings.create(**kwargs)
+            response = _retry_embed(self.client.embeddings.create, **kwargs)
             all_embeddings.extend(item.embedding for item in sorted(response.data, key=lambda x: x.index))
         return all_embeddings
