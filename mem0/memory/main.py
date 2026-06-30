@@ -858,7 +858,13 @@ class Memory(MemoryBase):
                     extracted_memories = json.loads(response, strict=False).get("memory", [])
                 except json.JSONDecodeError:
                     extracted_json = extract_json(response)
-                    extracted_memories = json.loads(extracted_json, strict=False).get("memory", [])
+                    try:
+                        extracted_memories = json.loads(extracted_json, strict=False).get("memory", [])
+                    except json.JSONDecodeError:
+                        # Last resort: raw_decode stops at first complete JSON object,
+                        # ignoring any trailing text (e.g. Qwen3 thinking artifacts)
+                        obj, _ = json.JSONDecoder().raw_decode(extracted_json.strip())
+                        extracted_memories = obj.get("memory", [])
         except Exception as e:
             logger.error(f"Error parsing extraction response: {e}")
             extracted_memories = []
@@ -2398,7 +2404,11 @@ class AsyncMemory(MemoryBase):
                     extracted_memories = json.loads(response, strict=False).get("memory", [])
                 except json.JSONDecodeError:
                     extracted_json = extract_json(response)
-                    extracted_memories = json.loads(extracted_json, strict=False).get("memory", [])
+                    try:
+                        extracted_memories = json.loads(extracted_json, strict=False).get("memory", [])
+                    except json.JSONDecodeError:
+                        obj, _ = json.JSONDecoder().raw_decode(extracted_json.strip())
+                        extracted_memories = obj.get("memory", [])
         except Exception as e:
             logger.error(f"Error parsing extraction response (async): {e}")
             extracted_memories = []
